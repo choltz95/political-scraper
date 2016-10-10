@@ -63,7 +63,9 @@ def get_articles(query, max_date=0):
   :return: list article dictionary objects
   """
   url = 'http://www.breitbart.com/big-journalism/page/{}/'.format(query)
-  page = yield from get(url, compress=True)
+  sem = asyncio.Semaphore(5) # at most 5 concurrent get requests
+  with (yield from sem):
+    page = yield from get(url, compress=True)
   articles = get_articles_on_page(page, max_date)
   pbar.update(100)
   return(articles)
@@ -89,7 +91,7 @@ if len(sys.argv) > 1:
   if len(sys.argv) > 2:
     num_cores = int(sys.argv[2])
 
-num_pages = 49 # limit query to 200 pages ~ 3 years of articles
+num_pages = 3 # limit query to 200 pages ~ 3 years of articles
 pbar = tqdm.tqdm(desc='Scraping pages',total=100*num_pages) # progress bar
 loop = asyncio.get_event_loop()
 f = asyncio.gather(*[get_articles(d) for d in range(num_pages)])
