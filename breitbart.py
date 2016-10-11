@@ -22,7 +22,7 @@ def get(*args, **kwargs):
       response = yield from aiohttp.request('GET', *args, **kwargs)
       return (yield from response.text())
     except Exception as e:
-      err.append(str(e) + "\n")
+      errs.append(str(e))
       return(1)
     
 def get_articles_on_page(page, max_date):
@@ -56,12 +56,12 @@ def get_articles_on_page(page, max_date):
           else:
             continue
         except Exception as e:
-          errs.append(str(e) + "\n")
+          errs.append(str(e))
           continue
     return(articles)
     
 @asyncio.coroutine
-def get_articles(topic,pagenum, max_date=0):
+def get_articles(topic,pagenum,sem,max_date=0):
   """
   Given a page number,
   download all article content for each article listed
@@ -69,7 +69,6 @@ def get_articles(topic,pagenum, max_date=0):
   :return: list article dictionary objects
   """
   url = 'http://www.breitbart.com/{}/page/{}/'.format(topic,pagenum)
-  sem = asyncio.Semaphore(5) # at most 5 concurrent get requests
   with (yield from sem):
     page = yield from get(url, compress=True)
   if page != 1:
@@ -102,9 +101,10 @@ if len(sys.argv) > 1:
     num_cores = int(sys.argv[2])
 
 num_pages = 800 # limit query
+sem = asyncio.Semaphore(5) # at most 5 concurrent get requests
 pbar = tqdm.tqdm(desc='Scraping pages',total=100*num_pages*len(topics)) # progress bar
 loop = asyncio.get_event_loop()
-f = asyncio.gather(*[get_articles(topic,pagenum,y_end) for topic in topics for pagenum in range(1,num_pages)])
+f = asyncio.gather(*[get_articles(topic,pagenum,sem,y_end) for topic in topics for pagenum in range(1,num_pages)])
 data = loop.run_until_complete(f)
 loop.close()
 pbar.close()
