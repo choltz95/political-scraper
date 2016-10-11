@@ -9,6 +9,7 @@ from bs4 import BeautifulSoup
 import tqdm
 import json
 
+err = open('log.txt',"w")
 topics = ["big-government","big-journalism", "big-hollywood", "national-security", "tech", "sports", "2016-presidential-race", "london", "jerusalem","texas", "california"]
 articleids = [] # list of article ids we have seen
 
@@ -18,10 +19,11 @@ def get(*args, **kwargs):
     A wrapper method for aiohttp's get method.
     """
     try:
-        response = yield from aiohttp.request('GET', *args, **kwargs)
-        return (yield from response.text())
-    except:
-        return(1)
+      response = yield from aiohttp.request('GET', *args, **kwargs)
+      return (yield from response.text())
+    except Exception as e:
+      err.write(str(e) + "\n")
+      return(1)
     
 def get_articles_on_page(page, max_date):
     """
@@ -54,7 +56,7 @@ def get_articles_on_page(page, max_date):
           else:
             continue
         except Exception as e:
-          #print(str(e))
+          err.write(str(e) + "\n")
           continue
     return(articles)
     
@@ -66,7 +68,6 @@ def get_articles(topic,pagenum, max_date=0):
   :param query: article list page number
   :return: list article dictionary objects
   """
-  #url = 'http://www.breitbart.com/big-journalism/page/{}/'.format(query)
   url = 'http://www.breitbart.com/{}/page/{}/'.format(topic,pagenum)
   sem = asyncio.Semaphore(5) # at most 5 concurrent get requests
   with (yield from sem):
@@ -94,14 +95,13 @@ def get_text_from_article(url):
   return(articleText)
 
 # year range
-#y_start = sys.argv[1]
-y_end = 0
+y_end = 2011-1
 if len(sys.argv) > 1:
   y_end = int(sys.argv[1])
   if len(sys.argv) > 2:
     num_cores = int(sys.argv[2])
 
-num_pages = 2 # limit query to 200 pages ~ 3 years of articles
+num_pages = 3 # limit query
 pbar = tqdm.tqdm(desc='Scraping pages',total=100*num_pages*len(topics)) # progress bar
 loop = asyncio.get_event_loop()
 f = asyncio.gather(*[get_articles(topic,pagenum,y_end) for topic in topics for pagenum in range(1,num_pages)])
@@ -111,9 +111,13 @@ pbar.close()
 
 data = [item for sublist in tqdm.tqdm(data,desc='Flattening') for item in sublist]
 
+print(str(len(data)) + ' articles saved')
+
 with open('output.json','w') as f:
   f.write(json.dumps(data))
 
 with open('article_ids.txt','w') as f:
   for aid in articleids:
     f.write(aid + '\n')
+
+err.close()
