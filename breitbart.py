@@ -9,6 +9,7 @@ from bs4 import BeautifulSoup
 import tqdm
 import json
 
+topics = ["big-government","big-journalism", "big-hollywood", "national-security", "tech", "sports", "2016-presidential-race", "london", "jerusalem","texas", "california"]
 articleids = [] # list of article ids we have seen
 
 @asyncio.coroutine
@@ -16,8 +17,11 @@ def get(*args, **kwargs):
     """
     A wrapper method for aiohttp's get method.
     """
-    response = yield from aiohttp.request('GET', *args, **kwargs)
-    return (yield from response.text())
+    try:
+        response = yield from aiohttp.request('GET', *args, **kwargs)
+        return (yield from response.text())
+    except:
+        return(1)
     
 def get_articles_on_page(page, max_date):
     """
@@ -55,18 +59,23 @@ def get_articles_on_page(page, max_date):
     return(articles)
     
 @asyncio.coroutine
-def get_articles(query, max_date=0):
+def get_articles(topic,pagenum, max_date=0):
   """
   Given a page number,
   download all article content for each article listed
   :param query: article list page number
   :return: list article dictionary objects
   """
-  url = 'http://www.breitbart.com/big-journalism/page/{}/'.format(query)
+  #url = 'http://www.breitbart.com/big-journalism/page/{}/'.format(query)
+  url = 'http://www.breitbart.com/{}/page/{}/'.format(topic,pagenum)
   sem = asyncio.Semaphore(5) # at most 5 concurrent get requests
   with (yield from sem):
     page = yield from get(url, compress=True)
-  articles = get_articles_on_page(page, max_date)
+  if page != 1:
+    articles = get_articles_on_page(page, max_date)
+  else:
+    pbar.update(100)
+    return([])
   pbar.update(100)
   return(articles)
 
@@ -86,20 +95,21 @@ def get_text_from_article(url):
 
 # year range
 #y_start = sys.argv[1]
+y_end = 0
 if len(sys.argv) > 1:
   y_end = int(sys.argv[1])
   if len(sys.argv) > 2:
     num_cores = int(sys.argv[2])
 
-num_pages = 3 # limit query to 200 pages ~ 3 years of articles
-pbar = tqdm.tqdm(desc='Scraping pages',total=100*num_pages) # progress bar
+num_pages = 2 # limit query to 200 pages ~ 3 years of articles
+pbar = tqdm.tqdm(desc='Scraping pages',total=100*num_pages*len(topics)) # progress bar
 loop = asyncio.get_event_loop()
-f = asyncio.gather(*[get_articles(d) for d in range(num_pages)])
+f = asyncio.gather(*[get_articles(topic,pagenum,y_end) for topic in topics for pagenum in range(1,num_pages)])
 data = loop.run_until_complete(f)
 loop.close()
 pbar.close()
 
-data = [item for sublist in data for item in sublist]
+data = [item for sublist in tqdm.tqdm(data,desc='Flattening') for item in sublist]
 
 with open('output.json','w') as f:
   f.write(json.dumps(data))
