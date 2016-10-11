@@ -9,7 +9,7 @@ from bs4 import BeautifulSoup
 import tqdm
 import json
 
-err = open('log.txt',"w")
+errs = []
 topics = ["big-government","big-journalism", "big-hollywood", "national-security", "tech", "sports", "2016-presidential-race", "london", "jerusalem","texas", "california"]
 articleids = [] # list of article ids we have seen
 
@@ -22,7 +22,7 @@ def get(*args, **kwargs):
       response = yield from aiohttp.request('GET', *args, **kwargs)
       return (yield from response.text())
     except Exception as e:
-      err.write(str(e) + "\n")
+      err.append(str(e) + "\n")
       return(1)
     
 def get_articles_on_page(page, max_date):
@@ -56,7 +56,7 @@ def get_articles_on_page(page, max_date):
           else:
             continue
         except Exception as e:
-          err.write(str(e) + "\n")
+          errs.append(str(e) + "\n")
           continue
     return(articles)
     
@@ -101,7 +101,7 @@ if len(sys.argv) > 1:
   if len(sys.argv) > 2:
     num_cores = int(sys.argv[2])
 
-num_pages = 3 # limit query
+num_pages = 800 # limit query
 pbar = tqdm.tqdm(desc='Scraping pages',total=100*num_pages*len(topics)) # progress bar
 loop = asyncio.get_event_loop()
 f = asyncio.gather(*[get_articles(topic,pagenum,y_end) for topic in topics for pagenum in range(1,num_pages)])
@@ -120,4 +120,6 @@ with open('article_ids.txt','w') as f:
   for aid in articleids:
     f.write(aid + '\n')
 
-err.close()
+with open('log.txt','w') as f:
+  for err in errs:
+    f.write(err + '\n')
