@@ -8,6 +8,8 @@ import dateutil.parser as dateparse
 from bs4 import BeautifulSoup
 import tqdm
 import json
+from time import sleep
+from random import uniform
 
 errs = []
 topics = ["big-government","big-journalism", "big-hollywood", "national-security", "tech", "sports", "2016-presidential-race", "london", "jerusalem","texas", "california"]
@@ -36,7 +38,7 @@ def get_articles_on_page(page, max_date):
     soup = BeautifulSoup(page, "html5lib")
     a = soup.find_all('article')
     articles = []
-    pool = mp.Pool(processes=CORES)
+#    pool = mp.Pool(processes=mp.cpu_count())
     for article in a:
         try:
           if article['id'] not in articleids:
@@ -55,6 +57,9 @@ def get_articles_on_page(page, max_date):
               adict['author'] = article.find('a', {'class' : 'byauthor'}).text
               adict['tags'] = article_content[1]
               articles.append(adict)
+	
+              stime = uniform(0,4)
+              sleep(stime)
             else: # break cycle if exceeds max year
               break
           else:
@@ -106,13 +111,13 @@ def get_text_from_article(url):
   return(articleText,tags)
 
 # year range
-y_end = 2011-1
+y_end = 0
 if len(sys.argv) > 1:
   y_end = int(sys.argv[1])
   if len(sys.argv) > 2:
     num_cores = int(sys.argv[2])
 
-num_pages = 2 # limit query
+num_pages = 3 # limit query
 sem = asyncio.Semaphore(200) # at most n concurrent get requests
 pbar = tqdm.tqdm(desc='Scraping pages',total=100*num_pages*len(topics)) # progress bar
 loop = asyncio.get_event_loop()
