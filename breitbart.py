@@ -36,6 +36,7 @@ def get_articles_on_page(page, max_date):
     soup = BeautifulSoup(page, "html5lib")
     a = soup.find_all('article')
     articles = []
+    pool = mp.Pool(processes=CORES)
     for article in a:
         try:
           if article['id'] not in articleids:
@@ -95,10 +96,13 @@ def get_text_from_article(url):
   tags = []
   footer = soup.find('footer',{'class': 'articlefooter'})
   content = soup.find("div", { "class" : "entry-content" })
+  for spam in content.find_all('p', {"class": "sh2"}):
+    spam.decompose()
   for p in content.find_all('p'):
     articleText = articleText+p.getText()
   for a in footer.find_all('a'):
     tags.append(a.text)
+  tags = [x.strip() for x in tags if x.strip()]
   return(articleText,tags)
 
 # year range
