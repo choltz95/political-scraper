@@ -43,13 +43,16 @@ def get_articles_on_page(page, max_date):
             if int(dateparse.parse(date.text).year) > max_date: # if we have not reached the max year yet continue
               adict = {}
               anchor = article.find('a')
+              article_content = get_text_from_article(anchor['href'])
               if anchor is not None:
                 adict['title'] = anchor['title']
               adict['id'] = article['id']
               articleids.append(article['id'])
               adict['date'] = date.text
               adict['url'] = anchor['href']
-              adict['content'] = get_text_from_article(anchor['href'])
+              adict['content'] = article_content[0]
+              adict['author'] = article.find('a', {'class' : 'byauthor'}).text
+              adict['tags'] = article_content[1]
               articles.append(adict)
             else: # break cycle if exceeds max year
               break
@@ -89,9 +92,14 @@ def get_text_from_article(url):
   page = urlopen(url).read()
   soup = BeautifulSoup(page, "html5lib")
   articleText = ''
-  for p in soup.find_all('p'):
+  tags = []
+  footer = soup.find('footer',{'class': 'articlefooter'})
+  content = soup.find("div", { "class" : "entry-content" })
+  for p in content.find_all('p'):
     articleText = articleText+p.getText()
-  return(articleText)
+  for a in footer.find_all('a'):
+    tags.append(a.text)
+  return(articleText,tags)
 
 # year range
 y_end = 2011-1
@@ -100,8 +108,8 @@ if len(sys.argv) > 1:
   if len(sys.argv) > 2:
     num_cores = int(sys.argv[2])
 
-num_pages = 800 # limit query
-sem = asyncio.Semaphore(5) # at most 5 concurrent get requests
+num_pages = 2 # limit query
+sem = asyncio.Semaphore(200) # at most n concurrent get requests
 pbar = tqdm.tqdm(desc='Scraping pages',total=100*num_pages*len(topics)) # progress bar
 loop = asyncio.get_event_loop()
 f = asyncio.gather(*[get_articles(topic,pagenum,sem,y_end) for topic in topics for pagenum in range(1,num_pages)])
@@ -122,4 +130,5 @@ with open('article_ids.txt','w') as f:
 
 with open('log.txt','w') as f:
   for err in errs:
-    f.write(err + '\n')
+    if err.strip() != "":
+      f.write(err + '\n')
