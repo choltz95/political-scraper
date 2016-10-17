@@ -11,20 +11,28 @@ import json
 from time import sleep
 from random import uniform
 
-errs = []
-topics = ["big-government","big-journalism", "big-hollywood", "national-security", "tech", "sports", "2016-presidential-race", "london", "jerusalem","texas", "california"]
+errs = [] # error-log list
+topics = ["big-government","big-journalism", "big-hollywood", "national-security", "tech", "sports", "2016-presidential-race", "london", "jerusalem","texas", "california"] # set of breitbart topics
 articleids = [] # list of article ids we have seen
 
 @asyncio.coroutine
-def get(*args, **kwargs):
+def get(*args,n=0, **kwargs): # recursive n details how many times we have attempted this get.
     """
     A wrapper method for aiohttp's get method.
     """
+    if n > 10:
+      return(1)
     try:
       response = yield from aiohttp.request('GET', *args, **kwargs)
       return (yield from response.text())
-    except Exception as e:
-      errs.append(str(e))
+    except Exception as e: # except non http-200 responses
+      errs.append('[GET]: ' + str(e))
+      #if str(503) in str(e):
+      #  sleep(200) # sleep longer
+      #  response = yield from aiohttp.request('GET',*args,**kwargs,n++)
+      #  return (yield from response.text())
+      #else:
+        #errs.append('[GET(failed)]: ' + str(e))
       return(1)
     
 def get_articles_on_page(page, max_date):
@@ -45,7 +53,7 @@ def get_articles_on_page(page, max_date):
             date = article.find('span', {'class' : 'bydate'})
             if int(dateparse.parse(date.text).year) > max_date: # if we have not reached the max year yet continue
               adict = {}
-              anchor = article.find('a')
+              anchor = article.find('a') # first anchor in the article list is the article url
               article_content = get_text_from_article(anchor['href'])
               if anchor is not None:
                 adict['title'] = anchor['title']
@@ -58,14 +66,14 @@ def get_articles_on_page(page, max_date):
               adict['tags'] = article_content[1]
               articles.append(adict)
 	
-              stime = uniform(0,4)
-              sleep(stime)
+              #stime = uniform(0,4) # randomize sleep times
+              #sleep(stime) # sleep between article requests
             else: # break cycle if exceeds max year
               break
           else:
             continue
         except Exception as e:
-          errs.append(str(e))
+          errs.append('[ART]: '+str(e))
           continue
     return(articles)
     
@@ -77,7 +85,7 @@ def get_articles(topic,pagenum,sem,max_date=0):
   :param query: article list page number
   :return: list article dictionary objects
   """
-  url = 'http://www.breitbart.com/{}/page/{}/'.format(topic,pagenum)
+  url = 'http://www.breitbart.com/{}/page/{}/'.format(topic, pagenum)
   with (yield from sem):
     page = yield from get(url, compress=True)
   if page != 1:
@@ -107,7 +115,7 @@ def get_text_from_article(url):
     articleText = articleText+p.getText()
   for a in footer.find_all('a'):
     tags.append(a.text)
-  tags = [x.strip() for x in tags if x.strip()]
+  tags = [x.strip() for x in tags if x.strip()] # for some reason, breitbart sometimes include empty anchor tags in the footer. Remove these from tag list
   return(articleText,tags)
 
 # year range
@@ -126,7 +134,7 @@ data = loop.run_until_complete(f)
 loop.close()
 pbar.close()
 
-data = [item for sublist in tqdm.tqdm(data,desc='Flattening') for item in sublist]
+data = [item for sublist in tqdm.tqdm(data,desc='Flattening') for item in sublist] # flatten async queue
 
 print(str(len(data)) + ' articles saved')
 
