@@ -21,28 +21,29 @@ def getNext(data):
       return cursor["next"]
   return None
 
+def scrape(url):
+    api_key = open("api_key.txt").read().strip()
+    forum = "breitbartproduction"
+    #thread = "link:http://www.breitbart.com/tech/2016/11/12/report-university-of-pennsylvania-offers-puppies-coloring-books-to-students-distraught-over-trump-win/"
+    thread_url = url
+    thread = 'link:'+thread_url
+    comments = []
+    url = makeURL(disqus, api_key, forum, thread)
+    data = getJSON(url)
+    hops = 0
 
-api_key = open("api_key.txt").read().strip()
-forum = "breitbartproduction"
-#thread = "link:http://www.breitbart.com/tech/2016/11/12/report-university-of-pennsylvania-offers-puppies-coloring-books-to-students-distraught-over-trump-win/"
-thread_url = sys.argv[1]
-thread = 'link:'+thread_url
-comments = []
-url = makeURL(disqus, api_key, forum, thread)
-data = getJSON(url)
-hops = 0
-
-comments.append(data)
-while data and hops < 20:
-  nextPage = getNext(data)
-  print nextPage
-  if nextPage:
-    url2 = "%s&cursor=%s" % (url, nextPage)
-    data = getJSON(url2)
     comments.append(data)
-  else:
-    break
-  hops += 1
+    while data and hops < 25:
+      nextPage = getNext(data)
+      #print nextPage
+      if nextPage:
+        url2 = "%s&cursor=%s" % (url, nextPage)
+        data = getJSON(url2)
+        comments.append(data)
+      else:
+        break
+      hops += 1
 
-with open('./data/'+thread_url.replace('/','_'),'w') as f:
-    json.dump(comments,f,indent=2)
+    with open('./data/'+thread_url.replace('/','_'),'w') as f:
+        json.dump(comments,f,indent=2)
+    return comments
