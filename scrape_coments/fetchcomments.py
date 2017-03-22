@@ -1,5 +1,6 @@
 import urllib, json
 import sys
+import time
 
 disqus = "http://disqus.com/api/3.0/posts/list.json"
 
@@ -17,9 +18,28 @@ def getJSON(url):
 def getNext(data):
   if data and data.has_key("cursor"):
     cursor = data["cursor"]
-    if cursor.has_key("next"):
-      return cursor["next"]
+    if cursor.has_key("hasNext"):
+        if cursor["hasNext"] == False:
+            return None
+        else:
+            if cursor.has_key("next"):
+              return cursor["next"]
   return None
+
+def verify_thread(data):
+    i = 0
+    ids = set()
+    try: # bad
+        for comment in data['response']:
+            ids.add(comment['thread'])
+        if len(ids) > 1:
+            print('[DEBUG] verify_thread - no thread')
+            return 1
+        else:
+            return 0
+    except:
+        print('[DEBUG] verify_thread - rate limit')
+        return -1
 
 def scrape(url):
     api_key = open("api_key.txt").read().strip()
@@ -33,7 +53,14 @@ def scrape(url):
     hops = 0
 
     comments.append(data)
-    while data and hops < 25:
+    while data and hops < 800: 
+      v = verify_thread(data)
+      if v == 1:
+        return 1
+      elif v == -1:
+        print('ratelimit exceeded on: ' + url)
+        time.sleep(3000) # wait hour to reset rate limit
+        return 2
       nextPage = getNext(data)
       #print nextPage
       if nextPage:
@@ -43,7 +70,7 @@ def scrape(url):
       else:
         break
       hops += 1
-
-    with open('./data/'+thread_url.replace('/','_'),'w') as f:
+      time.sleep(4)
+    with open('./data/'+thread_url.replace('/','_')+'.json','w') as f:
         json.dump(comments,f,indent=2)
     return comments
